@@ -1,0 +1,22 @@
+.DS_Store
+*.pyc
+cdk/.env
+cdk/__pycache__*
+cdk/cdk.out
+cdk/cdk/cdk.egg*
+
+# Python Virtual Env
+.env
+
+# Visual Studio
+.vs/
+.vscode/
+
+# JetBrains IDEs
+.idea
+
+# Node Modules
+node_modules/
+
+# CDK output
+cdk/cdk.out
