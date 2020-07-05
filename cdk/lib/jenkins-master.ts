@@ -3,6 +3,7 @@ import * as ecs from '@aws-cdk/aws-ecs';
 import * as ecs_patterns from '@aws-cdk/aws-ecs-patterns';
 import * as sd from '@aws-cdk/aws-servicediscovery';
 import * as ec2 from '@aws-cdk/aws-ec2';
+import * as elb from '@aws-cdk/aws-elasticloadbalancingv2';
 import * as iam from '@aws-cdk/aws-iam';
 import * as logs from '@aws-cdk/aws-logs';
 import * as cdk from '@aws-cdk/core';
@@ -92,8 +93,55 @@ export class JenkinsMaster extends cdk.Stack {
       },
     });
 
+    // Fargate: TaskDefinition
+    const jenkinsMasterTask = new ecs.Ec2TaskDefinition(this, "JenkinsMasterTaskDef", {
+      networkMode: ecs.NetworkMode.AWS_VPC,
+      volumes: [{ name: "efs_mount", host: { sourcePath: '/mnt/efs' } }],
+    })
+    jenkinsMasterTask.addContainer("JenkinsMasterContainer", {
+      image: image,
+      cpu: 4096,
+      memoryLimitMiB: 8192,
+      environment: environment,
+      logging: ecs.LogDriver.awsLogs({
+        streamPrefix: "JenkinsMaster",
+        logRetention: logs.RetentionDays.ONE_WEEK
+      }),
+    });
+    jenkinsMasterTask.defaultContainer?.addMountPoints({
+      containerPath: '/var/jenkins_home',
+      sourceVolume: "efs_mount",
+      readOnly: false,
+    });
+    jenkinsMasterTask.defaultContainer?.addPortMappings({ containerPort: 8080, hostPort: 8080 });
+
     // Fargate: Service
-    const jenkinsMasterService = jenkinsMasterServiceMain.service;
+   const jenkinsMasterService = new ecs.Ec2Service(this, "EC2MasterService", {
+      taskDefinition: jenkinsMasterTask,
+      cloudMapOptions: { name: "master", dnsRecordType: sd.DnsRecordType.A },
+      desiredCount: 1,
+      minHealthyPercent: 0,
+      maxHealthyPercent: 100,
+      enableECSManagedTags: true,
+      cluster: ecsCluster.cluster,
+    })
+
+    const jenkinsLoadBalancer = new elb.ApplicationLoadBalancer(this, "JenkinsMasterELB", {
+      vpc: network.vpc,
+      internetFacing: true,
+    });
+    const listener = jenkinsLoadBalancer.addListener("Listener", { port: 80 });
+    listener.addTargets("JenkinsMasterTarget", {
+      port: 80,
+      targets: [
+        jenkinsMasterService.loadBalancerTarget({
+          containerName: jenkinsMasterTask.defaultContainer?.containerName || '',
+          containerPort: 8080,
+        })
+      ],
+      deregistrationDelay: cdk.Duration.seconds(10)
+    })
+
     jenkinsMasterService.connections.allowFrom(
       worker.workerSecurityGroup,
       new ec2.Port({
@@ -113,8 +161,7 @@ export class JenkinsMaster extends cdk.Stack {
       })
     );
 
-    // Fargate: TaskDefinition
-    const jenkinsMasterTask = jenkinsMasterService.taskDefinition;
+    // Fargate: TaskDefinition (RolePolicy)
     jenkinsMasterTask.addToTaskRolePolicy(
       new iam.PolicyStatement({
         actions: [
