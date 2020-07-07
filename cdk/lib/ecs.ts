@@ -40,7 +40,7 @@ export class Ecs extends cdk.Stack {
     const asg = this.cluster.addCapacity("Ec2", {
       instanceType: new ec2.InstanceType('t3.xlarge'),
       keyName: "jenkinsonaws",
-    })
+    });
 
     const efsSecGrp = new ec2.SecurityGroup(this, "EFSSecGrp", {
       vpc: vpc,
@@ -55,15 +55,15 @@ export class Ecs extends cdk.Stack {
         toPort: 2049,
       }),
       "EFS"
-    )
+    );
 
     const efsFilesystem = new efs.CfnFileSystem(this, "EFSBackend");
-    vpc.privateSubnets.forEach(function(subnet, idx) {
-      new efs.CfnMountTarget(scope, `EFS${idx}`, {
+    vpc.privateSubnets.forEach((subnet, idx) => {
+      new efs.CfnMountTarget(this, `EFS${idx}`, {
         fileSystemId: efsFilesystem.ref,
         subnetId: subnet.subnetId,
         securityGroups: [efsSecGrp.securityGroupId]
-      })
+      });
     });
 
     const userData = `
@@ -71,7 +71,7 @@ sudo yum install -y amazon-efs-utils
 sudo mkdir /mnt/efs
 sudo chown -R ec2-user: /mnt/efs
 sudo chmod -R 0777 /mnt/efs
-sudo mount -t efs -o tls /mnt/efs ${this.efsFilesystem.ref}:/ efs`
-    asg.addUserData(userData)
+sudo mount -t efs -o tls /mnt/efs ${efsFilesystem.ref}:/ efs`;
+    asg.addUserData(userData);
   }
 }
