@@ -39,7 +39,10 @@ export class Ecs extends cdk.Stack {
      */
     const asg = this.cluster.addCapacity("Ec2", {
       instanceType: new ec2.InstanceType('t3.xlarge'),
-      keyName: "jenkinsonaws",
+      keyName: "jenkinskey",
+      allowAllOutbound: true,
+      associatePublicIpAddress: true,
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC }
     });
 
     const efsSecGrp = new ec2.SecurityGroup(this, "EFSSecGrp", {
