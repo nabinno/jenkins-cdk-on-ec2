@@ -1,4 +1,5 @@
-amazon-ecs:1.23
-blueocean:1.19.0
-pipeline-cloudwatch-logs:0.1
-configuration-as-code:1.32
+role-strategy:3.0
+github-oauth:0.33
+thinBackup:1.9
+envinject:2.3.0
+git:4.3.0
