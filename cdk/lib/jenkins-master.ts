@@ -1,6 +1,5 @@
 import * as ecr from '@aws-cdk/aws-ecr-assets';
 import * as ecs from '@aws-cdk/aws-ecs';
-import * as ecs_patterns from '@aws-cdk/aws-ecs-patterns';
 import * as sd from '@aws-cdk/aws-servicediscovery';
 import * as ec2 from '@aws-cdk/aws-ec2';
 import * as elb from '@aws-cdk/aws-elasticloadbalancingv2';
@@ -10,7 +9,6 @@ import * as cdk from '@aws-cdk/core';
 import { Network } from  './network';
 import { Ecs } from  './ecs';
 import { JenkinsWorker } from './jenkins-worker';
-import { LogDriver } from '@aws-cdk/aws-ecs';
 
 
 interface JenkinsMasterProps extends cdk.StackProps {
@@ -66,38 +64,12 @@ export class JenkinsMaster extends cdk.Stack {
       'worker_log_stream_prefix': worker.workerLogStream.logStreamName
     };
 
-    const taskDefinition = new ecs.FargateTaskDefinition(this, "JenkinsTaskDefinition", {
-      family: 'jenkins',
-      cpu: 512,
-      memoryLimitMiB: 2048,
-    });
-    const container = taskDefinition.addContainer('master', {
-      image: image,
-      environment: environment,
-      logging: LogDriver.awsLogs({ streamPrefix: "jenkinsLog" })
-    });
-    container.addPortMappings({ containerPort: 8080 });
-    container.addPortMappings({ containerPort: 50000, hostPort: 50000 });
-
-    const jenkinsMasterServiceMain = new ecs_patterns.ApplicationLoadBalancedFargateService(this, "JenkinsMasterService", {
-      serviceName: 'jenkins-svc',
-      cluster: ecsCluster.cluster,
-      taskDefinition: taskDefinition,
-      desiredCount: 1,
-      enableECSManagedTags: true,
-      publicLoadBalancer: true,
-      assignPublicIp: true,
-      cloudMapOptions: {
-        name: "master",
-        dnsRecordType: sd.DnsRecordType.A,
-      },
-    });
-
     // Fargate: TaskDefinition
     const jenkinsMasterTask = new ecs.Ec2TaskDefinition(this, "JenkinsMasterTaskDef", {
+      family: 'jenkins-master-task',
       networkMode: ecs.NetworkMode.AWS_VPC,
       volumes: [{ name: "efs_mount", host: { sourcePath: '/mnt/efs' } }],
-    })
+    });
     jenkinsMasterTask.addContainer("JenkinsMasterContainer", {
       image: image,
       cpu: 4096,
@@ -116,7 +88,8 @@ export class JenkinsMaster extends cdk.Stack {
     jenkinsMasterTask.defaultContainer?.addPortMappings({ containerPort: 8080, hostPort: 8080 });
 
     // Fargate: Service
-   const jenkinsMasterService = new ecs.Ec2Service(this, "EC2MasterService", {
+    const jenkinsMasterService = new ecs.Ec2Service(this, "EC2MasterService", {
+      serviceName: 'jenkins-svc',
       taskDefinition: jenkinsMasterTask,
       cloudMapOptions: { name: "master", dnsRecordType: sd.DnsRecordType.A },
       desiredCount: 1,
@@ -124,7 +97,7 @@ export class JenkinsMaster extends cdk.Stack {
       maxHealthyPercent: 100,
       enableECSManagedTags: true,
       cluster: ecsCluster.cluster,
-    })
+    });
 
     const jenkinsLoadBalancer = new elb.ApplicationLoadBalancer(this, "JenkinsMasterELB", {
       vpc: network.vpc,
@@ -140,7 +113,7 @@ export class JenkinsMaster extends cdk.Stack {
         })
       ],
       deregistrationDelay: cdk.Duration.seconds(10)
-    })
+    });
 
     jenkinsMasterService.connections.allowFrom(
       worker.workerSecurityGroup,
