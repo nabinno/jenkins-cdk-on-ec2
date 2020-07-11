@@ -10,7 +10,6 @@ import { Network } from  './network';
 import { Ecs } from  './ecs';
 import { JenkinsWorker } from './jenkins-worker';
 
-
 interface JenkinsMasterProps extends cdk.StackProps {
   ecsCluster: Ecs,
   network: Network,
@@ -72,8 +71,8 @@ export class JenkinsMaster extends cdk.Stack {
     });
     jenkinsMasterTask.addContainer("JenkinsMasterContainer", {
       image: image,
-      cpu: 4096,
-      memoryLimitMiB: 8192,
+      cpu: 512,
+      memoryLimitMiB: 1024,
       environment: environment,
       logging: ecs.LogDriver.awsLogs({
         streamPrefix: "JenkinsMaster",
