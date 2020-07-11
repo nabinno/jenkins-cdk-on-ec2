@@ -1,0 +1,53 @@
+jenkins:
+  authorizationStrategy:
+    roleBased:
+      roles:
+        global:
+          - name: "admin"
+            description: "Jenkins administrators"
+            permissions:
+              - "Overall/Administer"
+          - name: "jobcreator"
+            description: "Job-create users"
+            permissions:
+              - "Overall/Read"
+              - "Overall/SystemRead"
+              - "Credentials/Create"
+              - "Credentials/Delete"
+              - "Credentials/ManageDomains"
+              - "Credentials/Update"
+              - "Credentials/View"
+              - "Job/Build"
+              - "Job/Cancel"
+              - "Job/Configure"
+              - "Job/Create"
+              - "Job/Delete"
+              - "Job/Discover"
+              - "Job/ExtendedRead"
+              - "Job/Move"
+              - "Job/Read"
+              - "Job/Workspace"
+              - "View/Read"
+          - name: "jobrunner"
+            description: "Job-run users"
+            permissions:
+              - "Overall/Read"
+              - "Overall/SystemRead"
+              - "Credentials/Create"
+              - "Credentials/View"
+              - "Job/Build"
+              - "Job/Cancel"
+              - "Job/Configure"
+              - "Job/Create"
+              - "Job/Discover"
+              - "Job/ExtendedRead"
+              - "Job/Read"
+              - "Job/Workspace"
+              - "View/Read"
+          - name: "readonly"
+            description: "Read-only users"
+            permissions:
+              - "Overall/Read"
+              - "Overall/SystemRead"
+              - "Job/Read"
+              - "View/Read"
