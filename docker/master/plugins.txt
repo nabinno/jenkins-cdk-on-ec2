@@ -1,7 +1,7 @@
-role-strategy:3.0
+role-strategy:3.1
 github-oauth:0.33
-thinBackup:1.9
-git:4.3.0
+thinBackup:1.10
+git:4.6.0
 authorize-project:1.3.0
-configuration-as-code:1.41
-blueocean:1.23.2
+configuration-as-code:1.47
+blueocean:1.24.4
