@@ -13,7 +13,7 @@ export class JenkinsWorker extends cdk.Stack {
   public readonly workerSecurityGroup: ec2.SecurityGroup;
   public readonly workerExecutionRole: iam.Role;
   public readonly workerTaskRole: iam.Role;
-  public readonly workerLogsGroup: logs.LogGroup;
+  public readonly workerLogsGroup: logs.ILogGroup;
   public readonly workerLogStream: logs.LogStream;
 
   constructor(scope: cdk.App, id: string, props: JenkinsWorkerProps) {
@@ -22,11 +22,12 @@ export class JenkinsWorker extends cdk.Stack {
     const vpc = props.vpc;
 
     this.containerImage = new ecr.DockerImageAsset(this, "JenkinsWorkerDockerImage", {
-      repositoryName: 'jenkins/worker',
+      repositoryName: 'jenkins-worker-production',
       directory: '../docker/worker/'
     });
 
     this.workerSecurityGroup = new ec2.SecurityGroup(this, "WorkerSecurityGroup", {
+      securityGroupName: "jenkins-worker-integ-sg",
       vpc: vpc,
       description: "Jenkins Worker access to Jenkins Master",
     });
@@ -34,17 +35,18 @@ export class JenkinsWorker extends cdk.Stack {
     this.workerExecutionRole = new iam.Role(this, "WorkerExecutionRole", {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     })
-    this.workerExecutionRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy'));
+    this.workerExecutionRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonECSTaskExecutionRolePolicy')
+    );
 
     this.workerTaskRole = new iam.Role(this, "WorkerTaskRole", {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
 
-    this.workerLogsGroup = new logs.LogGroup(this, "WorkerLogGroup", {
-      retention: logs.RetentionDays.ONE_DAY
-    });
+    this.workerLogsGroup = logs.LogGroup.fromLogGroupName(this, "WorkerLogsGroup", "/ecs/jenkins-worker-production");
 
     this.workerLogStream = new logs.LogStream(this, "WorkerLogStream", {
+      logStreamName: "jenkins-worker-production",
       logGroup: this.workerLogsGroup
     });
   }

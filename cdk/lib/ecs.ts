@@ -26,7 +26,7 @@ export class Ecs extends cdk.Stack {
      * ECS Cluster
      */
     this.cluster = new ecs.Cluster(this, "EcsCluster", {
-      clusterName: 'jenkins',
+      clusterName: 'jenkins-production',
       vpc: vpc,
       defaultCloudMapNamespace: {
         name: serviceDiscoveryNamespace,
@@ -39,13 +39,14 @@ export class Ecs extends cdk.Stack {
      */
     const asg = this.cluster.addCapacity("Ec2", {
       instanceType: new ec2.InstanceType('t3.xlarge'),
-      keyName: "jenkinskey",
+      keyName: "jenkins-prod-key",
       allowAllOutbound: true,
       associatePublicIpAddress: true,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC }
     });
 
     const efsSecGrp = new ec2.SecurityGroup(this, "EFSSecGrp", {
+      securityGroupName: "jenkins-prod-efs-sg",
       vpc: vpc,
       allowAllOutbound: true,
     })
@@ -59,7 +60,6 @@ export class Ecs extends cdk.Stack {
       }),
       "EFS"
     );
-
     const efsFilesystem = new efs.CfnFileSystem(this, "EFSBackend");
     vpc.privateSubnets.forEach((subnet, idx) => {
       new efs.CfnMountTarget(this, `EFS${idx}`, {
@@ -68,7 +68,6 @@ export class Ecs extends cdk.Stack {
         securityGroups: [efsSecGrp.securityGroupId]
       });
     });
-
     const userData = `
 sudo yum install -y amazon-efs-utils
 sudo mkdir /mnt/efs

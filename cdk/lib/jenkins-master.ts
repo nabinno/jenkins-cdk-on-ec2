@@ -29,14 +29,14 @@ export class JenkinsMaster extends cdk.Stack {
     const ecsCluster = props.ecsCluster
     const network = props.network
     const worker = props.worker
-    const account = process.env.CDK_DEFAULT_ACCOUNT;
+    const account = process.env.CDK_DEFAULT_ACCOUNT || '';
     const region = process.env.CDK_DEFAULT_REGION || '';
 
     /**
      * ECR
      */
     const asset = new ecr.DockerImageAsset(this, "JenkinsMasterDockerImage", {
-      repositoryName: 'jenkins/master',
+      repositoryName: 'jenkins-master-production',
       directory: '../docker/master/'
     });
     const image = ecs.ContainerImage.fromDockerImageAsset(asset);
@@ -63,9 +63,9 @@ export class JenkinsMaster extends cdk.Stack {
       'worker_log_stream_prefix': worker.workerLogStream.logStreamName
     };
 
-    // Fargate: TaskDefinition
+    // ECS: TaskDefinition
     const jenkinsMasterTask = new ecs.Ec2TaskDefinition(this, "JenkinsMasterTaskDef", {
-      family: 'jenkins-master-task',
+      family: 'jenkins-master-production-task',
       networkMode: ecs.NetworkMode.AWS_VPC,
       volumes: [{ name: "efs_mount", host: { sourcePath: '/mnt/efs' } }],
     });
@@ -75,7 +75,7 @@ export class JenkinsMaster extends cdk.Stack {
       memoryLimitMiB: 1024,
       environment: environment,
       logging: ecs.LogDriver.awsLogs({
-        streamPrefix: "JenkinsMaster",
+        streamPrefix: "jenkins-master-prod-sg",
         logRetention: logs.RetentionDays.ONE_WEEK
       }),
     });
@@ -86,9 +86,16 @@ export class JenkinsMaster extends cdk.Stack {
     });
     jenkinsMasterTask.defaultContainer?.addPortMappings({ containerPort: 8080, hostPort: 8080 });
 
-    // Fargate: Service
+    // ECS: Service
+    const serviceSecGrp = new ec2.SecurityGroup(this, "JenkinsMasterServiceSecGrp", {
+      securityGroupName: "jenkins-master-prod-sg",
+      vpc: network.vpc,
+      allowAllOutbound: true,
+    });
+    serviceSecGrp.addIngressRule(worker.workerSecurityGroup, ec2.Port.tcp(50000), "from JenkinsWorkerSecurityGroup 50000");
+    serviceSecGrp.addIngressRule(worker.workerSecurityGroup, ec2.Port.tcp(8080), "from JenkinsWorkerSecurityGroup 8080");
     const jenkinsMasterService = new ecs.Ec2Service(this, "EC2MasterService", {
-      serviceName: 'jenkins-svc',
+      serviceName: 'jenkins-master-production-svc',
       taskDefinition: jenkinsMasterTask,
       cloudMapOptions: { name: "master", dnsRecordType: sd.DnsRecordType.A },
       desiredCount: 1,
@@ -98,7 +105,15 @@ export class JenkinsMaster extends cdk.Stack {
       cluster: ecsCluster.cluster,
     });
 
+    const albSecGrp = new ec2.SecurityGroup(this, "JenkinsMasterALBSecGrp", {
+      securityGroupName: "jenkins-master-prod-alb-sg",
+      vpc: network.vpc,
+      allowAllOutbound: false,
+    });
+    albSecGrp.addIngressRule(ec2.Peer.ipv4("0.0.0.0/0"), ec2.Port.tcp(80), "Allow from anyone on port 80");
+    albSecGrp.addEgressRule(serviceSecGrp, ec2.Port.tcp(8080), "Load balancer to target");
     const jenkinsLoadBalancer = new elb.ApplicationLoadBalancer(this, "JenkinsMasterELB", {
+      loadBalancerName: "jenkins-master-production-alb",
       vpc: network.vpc,
       internetFacing: true,
     });
@@ -111,29 +126,11 @@ export class JenkinsMaster extends cdk.Stack {
           containerPort: 8080,
         })
       ],
-      deregistrationDelay: cdk.Duration.seconds(10)
+      deregistrationDelay: cdk.Duration.seconds(10),
+      healthCheck: { path: '/login' },
     });
 
-    jenkinsMasterService.connections.allowFrom(
-      worker.workerSecurityGroup,
-      new ec2.Port({
-        protocol: ec2.Protocol.TCP,
-        stringRepresentation: 'Master to Worker 50000',
-        fromPort: 50000,
-        toPort: 50000
-      })
-    );
-    jenkinsMasterService.connections.allowFrom(
-      worker.workerSecurityGroup,
-      new ec2.Port({
-        protocol: ec2.Protocol.TCP,
-        stringRepresentation: 'Master to Worker 8080',
-        fromPort: 8080,
-        toPort: 8080
-      })
-    );
-
-    // Fargate: TaskDefinition (RolePolicy)
+    // ECS: TaskDefinition (RolePolicy)
     jenkinsMasterTask.addToTaskRolePolicy(
       new iam.PolicyStatement({
         actions: [
