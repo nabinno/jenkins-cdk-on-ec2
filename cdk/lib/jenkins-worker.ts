@@ -22,12 +22,12 @@ export class JenkinsWorker extends cdk.Stack {
     const vpc = props.vpc;
 
     this.containerImage = new ecr.DockerImageAsset(this, "JenkinsWorkerDockerImage", {
-      repositoryName: 'jenkins-worker-production',
+      repositoryName: 'jenkins-production-worker',
       directory: '../docker/worker/'
     });
 
     this.workerSecurityGroup = new ec2.SecurityGroup(this, "WorkerSecurityGroup", {
-      securityGroupName: "jenkins-worker-integ-sg",
+      securityGroupName: "jenkins-integ-worker-sg",
       vpc: vpc,
       description: "Jenkins Worker access to Jenkins Master",
     });
@@ -43,10 +43,10 @@ export class JenkinsWorker extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
 
-    this.workerLogsGroup = logs.LogGroup.fromLogGroupName(this, "WorkerLogsGroup", "/ecs/jenkins-worker-production");
+    this.workerLogsGroup = logs.LogGroup.fromLogGroupName(this, "WorkerLogsGroup", "/ecs/jenkins-production-worker");
 
     this.workerLogStream = new logs.LogStream(this, "WorkerLogStream", {
-      logStreamName: "jenkins-worker-production",
+      logStreamName: "jenkins-production-worker",
       logGroup: this.workerLogsGroup
     });
   }

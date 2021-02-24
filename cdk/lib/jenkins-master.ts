@@ -36,7 +36,7 @@ export class JenkinsMaster extends cdk.Stack {
      * ECR
      */
     const asset = new ecr.DockerImageAsset(this, "JenkinsMasterDockerImage", {
-      repositoryName: 'jenkins-master-production',
+      repositoryName: 'jenkins-production-master',
       directory: '../docker/master/'
     });
     const image = ecs.ContainerImage.fromDockerImageAsset(asset);
@@ -88,14 +88,14 @@ export class JenkinsMaster extends cdk.Stack {
 
     // ECS: Service
     const serviceSecGrp = new ec2.SecurityGroup(this, "JenkinsMasterServiceSecGrp", {
-      securityGroupName: "jenkins-master-prod-sg",
+      securityGroupName: "jenkins-prod-master-sg",
       vpc: network.vpc,
       allowAllOutbound: true,
     });
     serviceSecGrp.addIngressRule(worker.workerSecurityGroup, ec2.Port.tcp(50000), "from JenkinsWorkerSecurityGroup 50000");
     serviceSecGrp.addIngressRule(worker.workerSecurityGroup, ec2.Port.tcp(8080), "from JenkinsWorkerSecurityGroup 8080");
     const jenkinsMasterService = new ecs.Ec2Service(this, "EC2MasterService", {
-      serviceName: 'jenkins-master-production-svc',
+      serviceName: 'jenkins-production-master-svc',
       taskDefinition: jenkinsMasterTask,
       cloudMapOptions: { name: "master", dnsRecordType: sd.DnsRecordType.A },
       desiredCount: 1,
@@ -106,14 +106,14 @@ export class JenkinsMaster extends cdk.Stack {
     });
 
     const albSecGrp = new ec2.SecurityGroup(this, "JenkinsMasterALBSecGrp", {
-      securityGroupName: "jenkins-master-prod-alb-sg",
+      securityGroupName: "jenkins-prod-master-alb-sg",
       vpc: network.vpc,
       allowAllOutbound: false,
     });
     albSecGrp.addIngressRule(ec2.Peer.ipv4("0.0.0.0/0"), ec2.Port.tcp(80), "Allow from anyone on port 80");
     albSecGrp.addEgressRule(serviceSecGrp, ec2.Port.tcp(8080), "Load balancer to target");
     const jenkinsLoadBalancer = new elb.ApplicationLoadBalancer(this, "JenkinsMasterELB", {
-      loadBalancerName: "jenkins-master-production-alb",
+      loadBalancerName: "jenkins-production-master-alb",
       vpc: network.vpc,
       internetFacing: true,
     });
